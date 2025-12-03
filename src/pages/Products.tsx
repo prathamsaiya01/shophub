@@ -3,8 +3,9 @@ import { Link, useLocation } from 'react-router-dom';
 import { supabase } from '../services/supabase';
 import { Product } from '../types';
 import { formatPrice, calculateDiscount } from '../utils/formatting';
-import { ShoppingCart, Filter, Zap, X, Search } from 'lucide-react';
+import { ShoppingCart, Filter, Zap, X, Search, Heart } from 'lucide-react';
 import { useCart } from '../context/CartContext';
+import { useWishlist } from '../state/WishlistContext.tsx';
 
 type ProductWithImages = Product & {
   product_images?: {
@@ -31,7 +32,9 @@ export const Products: React.FC = () => {
   const [priceRange, setPriceRange] = useState<[number, number]>([0, 100000]);
   const [sortBy, setSortBy] = useState('newest');
   const [showFilters, setShowFilters] = useState(false);
+
   const { addToCart } = useCart();
+  const { isInWishlist, toggleWishlist } = useWishlist();
   const location = useLocation();
 
   // pick search from ?search= in URL (from Navigation search bar)
@@ -113,9 +116,10 @@ export const Products: React.FC = () => {
 
   const handleAddToCart = async (
     product: ProductWithImages,
-    e: React.MouseEvent
+    e: React.MouseEvent<HTMLButtonElement>
   ) => {
     e.preventDefault();
+    e.stopPropagation();
     try {
       await addToCart(product, 1);
       alert('Added to cart!');
@@ -126,11 +130,7 @@ export const Products: React.FC = () => {
 
   const getPrimaryImage = (product: ProductWithImages) => {
     const imgs = product.product_images || [];
-    return (
-      imgs.find((img) => img.is_primary) ||
-      imgs[0] ||
-      null
-    );
+    return imgs.find((img) => img.is_primary) || imgs[0] || null;
   };
 
   return (
@@ -216,7 +216,10 @@ export const Products: React.FC = () => {
                     type="number"
                     value={priceRange[0]}
                     onChange={(e) =>
-                      setPriceRange([parseInt(e.target.value) || 0, priceRange[1]])
+                      setPriceRange([
+                        parseInt(e.target.value) || 0,
+                        priceRange[1],
+                      ])
                     }
                     className="w-1/2 px-2 py-1 border border-gray-300 dark:border-gray-600 rounded dark:bg-gray-700 dark:text-white"
                     placeholder="Min"
@@ -281,6 +284,7 @@ export const Products: React.FC = () => {
                     : 0;
                   const displayPrice = product.discount_price || product.price;
                   const primaryImage = getPrimaryImage(product);
+                  const wishlisted = isInWishlist(product.id);
 
                   return (
                     <Link
@@ -327,12 +331,35 @@ export const Products: React.FC = () => {
                               </div>
                             )}
                           </div>
-                          <button
-                            onClick={(e) => handleAddToCart(product, e)}
-                            className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
-                          >
-                            <ShoppingCart className="w-5 h-5" />
-                          </button>
+
+                          <div className="flex items-center gap-2">
+                            {/* Cart button */}
+                            <button
+                              onClick={(e) => handleAddToCart(product, e)}
+                              className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                            >
+                              <ShoppingCart className="w-5 h-5" />
+                            </button>
+
+                            {/* Wishlist heart */}
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                e.stopPropagation();
+                                toggleWishlist(product.id);
+                              }}
+                              className="p-2 rounded-lg border bg-white text-gray-500 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+                            >
+                              <Heart
+                                className={`w-5 h-5 ${
+                                  wishlisted
+                                    ? 'fill-red-500 text-red-500'
+                                    : 'text-gray-400'
+                                }`}
+                              />
+                            </button>
+                          </div>
                         </div>
 
                         {product.stock_quantity < 5 && product.stock_quantity > 0 && (

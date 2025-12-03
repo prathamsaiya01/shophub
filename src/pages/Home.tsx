@@ -6,6 +6,8 @@ import { formatPrice, calculateDiscount } from '../utils/formatting';
 import { ShoppingCart, Heart, Zap, MessageCircle, X, Send } from 'lucide-react';
 import { useCart } from '../context/CartContext';
 
+import { useWishlist } from '../state/WishlistContext.tsx';
+
 type ProductWithImages = Product & {
   product_images?: {
     id: string;
@@ -24,6 +26,9 @@ export const Home: React.FC = () => {
   const [products, setProducts] = useState<ProductWithImages[]>([]);
   const [loading, setLoading] = useState(true);
   const { addToCart } = useCart();
+
+  // ❤️ wishlist
+  const { isInWishlist, toggleWishlist } = useWishlist();
 
   // AI assistant state
   const [assistantOpen, setAssistantOpen] = useState(false);
@@ -67,11 +72,7 @@ export const Home: React.FC = () => {
 
   const getPrimaryImage = (product: ProductWithImages) => {
     const imgs = product.product_images || [];
-    return (
-      imgs.find((img) => img.is_primary) ||
-      imgs[0] ||
-      null
-    );
+    return imgs.find((img) => img.is_primary) || imgs[0] || null;
   };
 
   // very simple "AI" – recommends products based on keywords and price words
@@ -188,6 +189,7 @@ export const Home: React.FC = () => {
                 : 0;
               const displayPrice = product.discount_price || product.price;
               const primaryImage = getPrimaryImage(product);
+              const wishlisted = isInWishlist(product.id);
 
               return (
                 <Link
@@ -251,10 +253,18 @@ export const Home: React.FC = () => {
                         <button
                           onClick={(e) => {
                             e.preventDefault();
+                            e.stopPropagation();
+                            toggleWishlist(product.id);
                           }}
                           className="p-2 bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-lg transition"
                         >
-                          <Heart className="w-5 h-5" />
+                          <Heart
+                            className={`w-5 h-5 ${
+                              wishlisted
+                                ? 'fill-red-500 text-red-500'
+                                : 'text-gray-400'
+                            }`}
+                          />
                         </button>
                       </div>
                     </div>

@@ -17,6 +17,9 @@ import {
   Bell,
 } from 'lucide-react';
 
+// 🆕 wishlist
+import { useWishlist } from '../state/WishlistContext.tsx';
+
 export const Navigation: React.FC = () => {
   const { user, isAuthenticated, signOut } = useAuth();
   const { itemCount } = useCart();
@@ -24,6 +27,10 @@ export const Navigation: React.FC = () => {
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // 🆕 wishlist count
+  const { wishlistIds } = useWishlist();
+  const wishlistCount = wishlistIds.length;
 
   const handleLogout = async () => {
     await signOut();
@@ -93,25 +100,32 @@ export const Navigation: React.FC = () => {
               )}
             </button>
 
+            {/* 🆕 Wishlist icon – visible for everyone */}
+            <Link
+              to="/wishlist"
+              className="relative p-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition"
+              title="Wishlist"
+            >
+              <Heart className="w-6 h-6" />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
+
+            {/* Price alerts – still only for logged-in users */}
             {isAuthenticated && (
-              <>
-                <Link
-                  to="/wishlist"
-                  className="p-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition"
-                  title="Wishlist"
-                >
-                  <Heart className="w-6 h-6" />
-                </Link>
-                <Link
-                  to="/price-alerts"
-                  className="p-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition"
-                  title="Price Alerts"
-                >
-                  <Bell className="w-6 h-6" />
-                </Link>
-              </>
+              <Link
+                to="/price-alerts"
+                className="p-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition"
+                title="Price Alerts"
+              >
+                <Bell className="w-6 h-6" />
+              </Link>
             )}
 
+            {/* Cart */}
             <Link
               to="/cart"
               className="relative p-2 text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 transition"
@@ -169,6 +183,19 @@ export const Navigation: React.FC = () => {
                 <Sun className="w-5 h-5 text-gray-700 dark:text-gray-300" />
               )}
             </button>
+
+            {/* Mobile wishlist icon */}
+            <Link
+              to="/wishlist"
+              className="relative p-2 text-gray-700 dark:text-gray-300 hover:text-blue-600"
+            >
+              <Heart className="w-6 h-6" />
+              {wishlistCount > 0 && (
+                <span className="absolute -top-1 -right-1 bg-pink-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center">
+                  {wishlistCount}
+                </span>
+              )}
+            </Link>
 
             <Link
               to="/cart"

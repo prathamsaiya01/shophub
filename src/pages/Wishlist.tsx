@@ -1,63 +1,57 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '../services/supabase';
-import { useAuth } from '../context/AuthContext';
-import { useCart } from '../context/CartContext';
 import { Product } from '../types';
-import { formatPrice, calculateDiscount } from '../utils/formatting';
-import { Heart, ShoppingCart, ArrowLeft, Zap } from 'lucide-react';
+import { formatPrice } from '../utils/formatting';
+import { useWishlist } from '../state/WishlistContext.tsx';
+import { useCart } from '../context/CartContext';
+import {
+  ArrowLeft,
+  Loader2,
+  Trash2,
+  ShoppingCart,
+  Heart,
+} from 'lucide-react';
 
-interface WishlistItem {
-  id: string;
-  user_id: string;
-  product_id: string;
-  product?: Product;
-  added_at: string;
-}
+type ProductWithImages = Product & {
+  product_images?: {
+    id: string;
+    image_url: string;
+    alt_text?: string;
+    is_primary: boolean;
+  }[];
+};
 
 export const Wishlist: React.FC = () => {
-  const { user, isAuthenticated } = useAuth();
+  const { wishlistIds, clearWishlist, isInWishlist, toggleWishlist } = useWishlist();
   const { addToCart } = useCart();
-  const [items, setItems] = useState<WishlistItem[]>([]);
-  const [loading, setLoading] = useState(true);
+
+  const [products, setProducts] = useState<ProductWithImages[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated) {
-      loadWishlist();
-    } else {
-      setLoading(false);
-    }
-  }, [isAuthenticated]);
-
-  const loadWishlist = async () => {
-    try {
-      const { data } = await supabase
-        .from('wishlists')
-        .select('*, products(*)')
-        .eq('user_id', user?.id)
-        .order('added_at', { ascending: false });
-
-      if (data) {
-        setItems(data as WishlistItem[]);
+    const fetchProducts = async () => {
+      if (wishlistIds.length === 0) {
+        setProducts([]);
+        return;
       }
-    } catch (error) {
-      console.error('Error loading wishlist:', error);
-    } finally {
+
+      setLoading(true);
+      const { data, error } = await supabase
+        .from('products')
+        .select('*, product_images(*)')
+        .in('id', wishlistIds);
+
+      if (!error && data) {
+        setProducts(data as ProductWithImages[]);
+      }
       setLoading(false);
-    }
-  };
+    };
 
-  const removeFromWishlist = async (itemId: string) => {
-    try {
-      const { error } = await supabase.from('wishlists').delete().eq('id', itemId);
-      if (error) throw error;
-      setItems(items.filter((item) => item.id !== itemId));
-    } catch (error) {
-      console.error('Error removing from wishlist:', error);
-    }
-  };
+    fetchProducts();
+  }, [wishlistIds]);
 
-  const handleAddToCart = async (product: Product) => {
+  const handleAddToCart = async (product: ProductWithImages) => {
     try {
       await addToCart(product, 1);
       alert('Added to cart!');
@@ -66,117 +60,147 @@ export const Wishlist: React.FC = () => {
     }
   };
 
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center">
-        <div className="text-center">
-          <p className="text-gray-600 dark:text-gray-400 mb-4">Please sign in to view your wishlist</p>
-          <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold">
-            Sign In
-          </Link>
+  const getPrimaryImage = (product: ProductWithImages) => {
+    const imgs = product.product_images || [];
+    return imgs.find((img) => img.is_primary) || imgs[0] || null;
+  };
+
+  // 🩶 EMPTY STATE (matches your screenshot)
+  const isEmpty = !loading && wishlistIds.length === 0;
+
+  return (
+    <div className="min-h-screen bg-white dark:bg-gray-900">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2">
+            <Link
+              to="/products"
+              className="inline-flex items-center text-sm text-blue-600"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" />
+              Continue Shopping
+            </Link>
+          </div>
+
+          {wishlistIds.length > 0 && (
+            <button
+              onClick={clearWishlist}
+              className="inline-flex items-center text-sm text-red-500 hover:text-red-600"
+            >
+              <Trash2 className="w-4 h-4 mr-1" />
+              Clear Wishlist
+            </button>
+          )}
         </div>
-      </div>
-    );
-  }
 
-  if (loading) {
-    return <div className="min-h-screen bg-white dark:bg-gray-900 flex items-center justify-center"><p>Loading...</p></div>;
-  }
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-6">
+          My Wishlist
+        </h1>
 
-  if (items.length === 0) {
-    return (
-      <div className="min-h-screen bg-white dark:bg-gray-900">
-        <div className="max-w-4xl mx-auto px-4 py-16">
-          <Link to="/products" className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6">
-            <ArrowLeft className="w-5 h-5" /> Continue Shopping
-          </Link>
-          <div className="text-center">
-            <Heart className="w-16 h-16 mx-auto text-gray-400 mb-4" />
-            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">Your Wishlist is Empty</h2>
-            <p className="text-gray-600 dark:text-gray-400 mb-8">
+        {loading ? (
+          <div className="flex items-center justify-center h-40">
+            <Loader2 className="w-6 h-6 animate-spin text-gray-500" />
+          </div>
+        ) : isEmpty ? (
+          // ✅ Empty state UI
+          <div className="flex flex-col items-center justify-center py-16 text-center">
+            <Heart className="w-12 h-12 text-gray-300 mb-4" />
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-gray-100 mb-1">
+              Your Wishlist is Empty
+            </h2>
+            <p className="text-sm text-gray-500 dark:text-gray-400 mb-6">
               Add items to your wishlist to save them for later
             </p>
-            <Link to="/products" className="inline-block bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700">
+            <Link
+              to="/products"
+              className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700"
+            >
               Explore Products
             </Link>
           </div>
-        </div>
-      </div>
-    );
-  }
+        ) : (
+          // ✅ Wishlist products grid
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+            {products.map((product) => {
+              const primaryImage = getPrimaryImage(product);
+              const displayPrice = product.discount_price || product.price;
+              const wishlisted = isInWishlist(product.id);
 
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 py-8">
-      <div className="max-w-6xl mx-auto px-4">
-        <Link to="/products" className="flex items-center gap-2 text-blue-600 hover:text-blue-700 mb-6">
-          <ArrowLeft className="w-5 h-5" /> Back to Products
-        </Link>
-
-        <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">My Wishlist ({items.length})</h1>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          {items.map((item) => {
-            if (!item.product) return null;
-            const product = item.product;
-            const discount = product.discount_price
-              ? calculateDiscount(product.price, product.discount_price)
-              : 0;
-            const displayPrice = product.discount_price || product.price;
-
-            return (
-              <div
-                key={item.id}
-                className="group bg-white dark:bg-gray-800 rounded-lg overflow-hidden hover:shadow-lg transition duration-300"
-              >
-                <div className="relative bg-gray-300 dark:bg-gray-700 h-48 overflow-hidden">
-                  {product.is_flash_sale && (
-                    <div className="absolute top-3 right-3 bg-red-500 text-white px-3 py-1 rounded-full text-sm font-bold flex items-center gap-1 z-10">
-                      <Zap className="w-4 h-4" /> Flash
-                    </div>
-                  )}
-                  {discount > 0 && !product.is_flash_sale && (
-                    <div className="absolute top-3 right-3 bg-green-500 text-white px-3 py-1 rounded-full text-sm font-bold">
-                      {discount}%
-                    </div>
-                  )}
-                  <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-700 dark:to-gray-600" />
-                </div>
-
-                <div className="p-4">
-                  <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-blue-600">
-                    {product.name}
-                  </h3>
-
-                  <div className="mt-4">
-                    <div className="text-lg font-bold text-gray-900 dark:text-white">
-                      {formatPrice(displayPrice)}
-                    </div>
-                    {product.discount_price && (
-                      <div className="text-sm text-gray-500 line-through">
-                        {formatPrice(product.price)}
-                      </div>
+              return (
+                <Link
+                  key={product.id}
+                  to={`/product/${product.slug}`}
+                  className="group bg-gray-50 dark:bg-gray-800 rounded-lg overflow-hidden hover:shadow-lg transition"
+                >
+                  <div className="relative bg-gray-300 dark:bg-gray-700 h-48 overflow-hidden">
+                    {primaryImage ? (
+                      <img
+                        src={primaryImage.image_url}
+                        alt={primaryImage.alt_text || product.name}
+                        className="w-full h-full object-cover transform group-hover:scale-105 transition"
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-gray-300 to-gray-400 dark:from-gray-700 dark:to-gray-600" />
                     )}
                   </div>
 
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={() => handleAddToCart(product)}
-                      className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg transition"
-                    >
-                      <ShoppingCart className="w-4 h-4" /> Add
-                    </button>
-                    <button
-                      onClick={() => removeFromWishlist(item.id)}
-                      className="p-2 bg-red-100 dark:bg-red-900/20 hover:bg-red-200 dark:hover:bg-red-900/40 text-red-600 dark:text-red-400 rounded-lg transition"
-                    >
-                      <Heart className="w-5 h-5 fill-current" />
-                    </button>
+                  <div className="p-4">
+                    <h3 className="font-semibold text-gray-900 dark:text-white line-clamp-2 group-hover:text-blue-600">
+                      {product.name}
+                    </h3>
+
+                    <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 line-clamp-2">
+                      {product.short_description || product.description}
+                    </p>
+
+                    <div className="mt-4 flex items-center justify-between">
+                      <div>
+                        <div className="text-lg font-bold text-gray-900 dark:text-white">
+                          {formatPrice(displayPrice)}
+                        </div>
+                        {product.discount_price && (
+                          <div className="text-sm text-gray-500 dark:text-gray-400 line-through">
+                            {formatPrice(product.price)}
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            handleAddToCart(product);
+                          }}
+                          className="p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition"
+                        >
+                          <ShoppingCart className="w-5 h-5" />
+                        </button>
+
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            toggleWishlist(product.id);
+                          }}
+                          className="p-2 rounded-lg border bg-white text-gray-500 hover:bg-gray-100 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600"
+                        >
+                          <Heart
+                            className={`w-5 h-5 ${
+                              wishlisted
+                                ? 'fill-red-500 text-red-500'
+                                : 'text-gray-400'
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+                </Link>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
