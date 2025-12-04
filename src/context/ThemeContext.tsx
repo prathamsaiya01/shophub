@@ -1,4 +1,3 @@
-// src/context/ThemeContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 
 type Theme = 'light' | 'dark';
@@ -18,10 +17,10 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
 }) => {
   const [theme, setThemeState] = useState<Theme>('light');
 
-  // apply theme to <html> and save to localStorage
   const applyTheme = (next: Theme) => {
     setThemeState(next);
-    const root = document.documentElement;
+
+    const root = document.documentElement; // <html>
 
     if (next === 'dark') {
       root.classList.add('dark');
@@ -32,21 +31,16 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({
     localStorage.setItem(STORAGE_KEY, next);
   };
 
-  // Initialize on first mount
   useEffect(() => {
-    // 1) From localStorage
+    // 1) try localStorage
     const stored = localStorage.getItem(STORAGE_KEY) as Theme | null;
-
     if (stored === 'light' || stored === 'dark') {
       applyTheme(stored);
       return;
     }
 
-    // 2) Else, follow system preference
-    const prefersDark = window.matchMedia?.(
-      '(prefers-color-scheme: dark)'
-    ).matches;
-
+    // 2) fallback to system preference
+    const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches;
     applyTheme(prefersDark ? 'dark' : 'light');
   }, []);
 
